@@ -73,11 +73,7 @@ body { background: #000; color: #fff; font-family: -apple-system, Helvetica, san
 .btn-pin-ok     { padding: 12px 28px; background: #e6aa25; border: none; border-radius: 10px; color: #000; font-size: 15px; font-weight: 700; cursor: pointer; }
 .btn-pin-cancel { padding: 12px 20px; background: #1a1a1a; border: none; border-radius: 10px; color: #666; font-size: 15px; cursor: pointer; }
 
-/* ── Debug overlay — remove in production ── */
-#debug { position: fixed; bottom: 0; left: 0; background: rgba(0,0,0,0.8); color: #0f0; font-size: 10px; padding: 5px; z-index: 9999; font-family: monospace; }
 </style>
-</head>
-<body>
 
 <!-- Login screen -->
 <div id="setup">
@@ -96,7 +92,7 @@ body { background: #000; color: #fff; font-family: -apple-system, Helvetica, san
   <div id="tabs">
     <div class="tab active" id="tab-all"    onclick="switchTab('all')">All photos</div>
     <div class="tab"        id="tab-album"  onclick="showAlbumPicker()" style="display:none">Albums ▾</div>
-    <div class="tab"        id="tab-locked" onclick="onLockedTab()">Private Folder</div>
+    <div class="tab"        id="tab-locked" onclick="onLockedTab()">🔒 Private</div>
   </div>
   <div id="album-picker"></div>
   <div id="content">
@@ -108,7 +104,7 @@ body { background: #000; color: #fff; font-family: -apple-system, Helvetica, san
 
 <!-- PIN modal -->
 <div id="pin-modal">
-  <h2>PRIVATE FOLDER</h2>
+  <h2>🔒 PRIVATE FOLDER</h2>
   <p>Enter your PIN</p>
   <input type="password" id="pin-input" placeholder="••••" maxlength="16"
          autocomplete="off" autocorrect="off" autocapitalize="none" />
@@ -124,14 +120,6 @@ body { background: #000; color: #fff; font-family: -apple-system, Helvetica, san
   <div id="lb-close" onclick="closeLightbox()">×</div>
   <img   id="lb-img"   src="" alt="" style="display:none" />
   <video id="lb-video" controls playsinline style="display:none"></video>
-</div>
-
-<!-- Debug overlay — remove in production -->
-<div id="debug">
-  Page: <span id="dbg-page">1</span> |
-  Busy: <span id="dbg-busy">false</span> |
-  Done: <span id="dbg-done">false</span> |
-  Assets: <span id="dbg-assets">0</span>
 </div>
 
 <script>
@@ -436,13 +424,11 @@ function load() {
 function doLoad() {
   if (busy || done) return;
   busy = true;
-  updateDebug();
 
   // Album tab: fetch all assets in the selected album in a single request
   if (tab === 'album' && albumId) {
     get('/api/albums/' + albumId, function(err, data) {
       busy = false;
-      updateDebug();
       if (err) { document.getElementById('loader').textContent = 'Error: ' + err.message; return; }
       var assets = (data && data.assets) ? data.assets : (Array.isArray(data) ? data : []);
       ingest(assets);
@@ -450,7 +436,6 @@ function doLoad() {
       buildTimeline();
       done = true;
       document.getElementById('loader').textContent = 'All loaded';
-      updateDebug();
     });
     return;
   }
@@ -469,7 +454,6 @@ function doLoad() {
 
   function handleSearchResult(err, data) {
     busy = false;
-    updateDebug();
 
     if (err) { document.getElementById('loader').textContent = 'Error: ' + err.message; return; }
 
@@ -478,7 +462,6 @@ function doLoad() {
     if (!assets.length) {
       done = true;
       document.getElementById('loader').textContent = 'All loaded';
-      updateDebug();
       return;
     }
 
@@ -493,7 +476,6 @@ function doLoad() {
     } else {
       document.getElementById('loader').textContent = '';
     }
-    updateDebug();
   }
 }
 
@@ -653,18 +635,6 @@ function fmtKey(k) {
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// ── Debug overlay ───────────────────────────────────────────────────────────
-
-function updateDebug() {
-  document.getElementById('dbg-page').textContent = PAGE;
-  document.getElementById('dbg-busy').textContent = busy;
-  document.getElementById('dbg-done').textContent = done;
-  var total = 0;
-  for (var k in groups) total += groups[k].length;
-  document.getElementById('dbg-assets').textContent = total;
-}
-
 // ── Event listeners ─────────────────────────────────────────────────────────
 
 // Infinite scroll: trigger load when within 1500px of the bottom (throttled to 300ms)
@@ -695,9 +665,6 @@ if (loadCfg()) {
   document.getElementById('cfg-key').value            = API_KEY;
   startApp();
 }
-
-// Keep the debug overlay up to date
-setInterval(updateDebug, 1000);
 </script>
 </body>
 </html>

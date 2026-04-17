@@ -20,7 +20,7 @@ Old Device (iOS 10)
        ├─ /api/* → proxied to your Immich server (port 2283)
        │            All API calls reach Immich unchanged.
        │
-       └─ /*     → serves index.html (Immich Lite UI)
+       └─ /*     → serves Page.html (Immich Lite UI)
                     Written in ES5-only JavaScript with no
                     frameworks, no fetch(), no arrow functions —
                     everything old Safari can understand.
@@ -55,7 +55,7 @@ The UI is intentionally minimal — no build tools, no dependencies, just one HT
 
 ### 1. Download the files
 
-Download `index.html`, `nginx.conf.template`, and `compose.yaml` from this repository.
+Download `Page.html`, `nginx.conf.template`, and `compose.yaml` from this repository.
 
 ### 2. Configure compose.yaml
 
@@ -93,7 +93,7 @@ This creates `/opt/immich-lite/` on your host.
 ### 4. Copy the files into place
 
 ```bash
-sudo cp index.html nginx.conf.template /opt/immich-lite/
+sudo cp Page.html nginx.conf.template /opt/immich-lite/
 ```
 
 ### 5. Restart the container

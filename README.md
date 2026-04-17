@@ -172,12 +172,14 @@ Immich Lite is a static HTML file served by nginx. It makes API calls directly t
 
 ## Proofs of work on IPAD
 
-<img width="1529" height="958" alt="IMG_1" src="https://github.com/user-attachments/assets/5b4cd952-5e57-4faa-a21a-7f0ccb2a439e" />
+<img width="1529" height="958" alt="IMG_1" src="https://github.com/user-attachments/assets/56476d91-ab0b-4e53-90c5-97a1e1c04bcb" />  
 
 
 
 
-<img width="1536" height="1914" alt="IMG_2" src="https://github.com/user-attachments/assets/b2b4cf76-0174-4639-a2c4-b2e32737adce" />
+<img width="1536" height="1914" alt="IMG_2" src="https://github.com/user-attachments/assets/322ba042-df3c-4cd3-beec-44672c5bf759" />
+
+
 
 ## License
 

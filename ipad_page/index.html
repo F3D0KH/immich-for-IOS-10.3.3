@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Immich Lite</title>
+<style>
+* { -webkit-box-sizing: border-box; box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #000; color: #fff; font-family: -apple-system, Helvetica, sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+
+/* ── Login screen ── */
+#setup { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+#setup h1 { font-size: 2rem; letter-spacing: 6px; color: #e6aa25; margin-bottom: 0.4rem; }
+#setup p  { color: #555; font-size: 0.85rem; margin-bottom: 2rem; text-align: center; line-height: 1.6; }
+#setup input { width: 100%; max-width: 360px; padding: 14px 16px; background: #111; border: 1px solid #2a2a2a; border-radius: 10px; color: #fff; font-size: 16px; margin-bottom: 10px; outline: none; -webkit-appearance: none; }
+#setup input:focus { border-color: #e6aa25; }
+#setup .btn-connect { width: 100%; max-width: 360px; padding: 14px; background: #e6aa25; border: none; border-radius: 10px; color: #000; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.link-logout { margin-top: 1.2rem; color: #444; font-size: 13px; cursor: pointer; }
+
+/* ── App shell ── */
+#app { display: none; }
+
+/* ── Tab bar ── */
+#tabs { position: fixed; top: 0; left: 0; right: 44px; height: 48px; background: rgba(0,0,0,0.93); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; padding: 0 10px; gap: 6px; z-index: 100; border-bottom: 1px solid #1c1c1c; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.tab { padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; color: #666; white-space: nowrap; }
+.tab.active { background: #e6aa25; color: #000; font-weight: 600; }
+
+/* ── Album picker dropdown ── */
+#album-picker { display: none; position: fixed; top: 48px; left: 0; right: 44px; background: #0d0d0d; z-index: 150; border-bottom: 1px solid #1c1c1c; max-height: 55vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#album-picker.open { display: block; }
+.album-item { padding: 13px 16px; border-bottom: 1px solid #1a1a1a; cursor: pointer; }
+.album-item-name  { font-size: 14px; color: #ddd; }
+.album-item-count { font-size: 11px; color: #555; margin-top: 2px; }
+.album-item:active { background: #1a1a1a; }
+
+/* ── Main content area ── */
+#content { padding-top: 52px; padding-right: 44px; }
+.date-label { padding: 10px 10px 4px; font-size: 11px; color: #555; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; }
+
+/* ── Photo grid — 4 columns, square cells via padding trick ── */
+.photo-row { display: -webkit-flex; display: flex; gap: 2px; margin-bottom: 2px; }
+.photo-cell { -webkit-flex: 1; flex: 1; position: relative; background: #111; overflow: hidden; cursor: pointer; }
+.photo-cell-inner { padding-bottom: 100%; position: relative; }
+.photo-cell img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; -o-object-fit: cover; object-fit: cover; display: block; }
+.video-mark { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.65); border-radius: 3px; padding: 2px 5px; font-size: 9px; color: #fff; pointer-events: none; }
+.photo-cell-filler { -webkit-flex: 1; flex: 1; background: #000; }
+
+/* ── Scrubber timeline (right sidebar) ── */
+#timeline { position: fixed; right: 0; top: 0; bottom: 0; width: 44px; background: rgba(0,0,0,0.9); display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; overflow-y: auto; padding-top: 50px; border-left: 1px solid #1c1c1c; z-index: 100; -webkit-overflow-scrolling: touch; }
+.tl-year  { padding: 7px 2px 1px; font-size: 9px; color: #e6aa25; text-align: center; font-weight: 700; cursor: pointer; }
+.tl-month { padding: 3px 2px; font-size: 9px; color: #555; text-align: center; cursor: pointer; }
+.tl-month:active, .tl-year:active { color: #fff; }
+
+/* ── Infinite scroll loader indicator ── */
+#loader { text-align: center; padding: 1.5rem; color: #444; font-size: 13px; }
+
+/* ── Full-screen lightbox ── */
+#lightbox { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #000; z-index: 200; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; }
+#lightbox.open { display: -webkit-flex; display: flex; }
+#lb-img   { max-width: 100%; max-height: 100%; -o-object-fit: contain; object-fit: contain; }
+#lb-video { max-width: 100%; max-height: 100%; }
+#lb-close { position: fixed; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.15); display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; font-size: 22px; cursor: pointer; z-index: 201; color: #fff; }
+
+/* ── PIN modal for locked folder ── */
+#pin-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.92); z-index: 300; -webkit-align-items: center; align-items: center; -webkit-justify-content: center; justify-content: center; -webkit-flex-direction: column; flex-direction: column; }
+#pin-modal.open { display: -webkit-flex; display: flex; }
+#pin-modal h2 { font-size: 1.1rem; letter-spacing: 3px; color: #e6aa25; margin-bottom: 0.4rem; }
+#pin-modal p  { color: #555; font-size: 0.8rem; margin-bottom: 1.4rem; text-align: center; }
+#pin-input { width: 200px; padding: 14px 16px; background: #111; border: 1px solid #2a2a2a; border-radius: 10px; color: #fff; font-size: 22px; letter-spacing: 8px; text-align: center; outline: none; -webkit-appearance: none; margin-bottom: 10px; }
+#pin-input:focus { border-color: #e6aa25; }
+#pin-error { color: #e05; font-size: 12px; height: 16px; margin-bottom: 8px; }
+.pin-btn-row    { display: -webkit-flex; display: flex; gap: 10px; }
+.btn-pin-ok     { padding: 12px 28px; background: #e6aa25; border: none; border-radius: 10px; color: #000; font-size: 15px; font-weight: 700; cursor: pointer; }
+.btn-pin-cancel { padding: 12px 20px; background: #1a1a1a; border: none; border-radius: 10px; color: #666; font-size: 15px; cursor: pointer; }
+
+</style>
+
+<!-- Login screen -->
+<div id="setup">
+  <h1>IMMICH</h1>
+  <p>Sign in to your account<br><span style="color:#333;font-size:11px">Login is required for the locked folder</span></p>
+  <input type="email"    id="cfg-email"    placeholder="Email"              autocapitalize="none" autocorrect="off" spellcheck="false" />
+  <input type="password" id="cfg-password" placeholder="Password"           autocomplete="current-password" />
+  <input type="text"     id="cfg-key"      placeholder="API Key (optional)"  autocapitalize="none" autocorrect="off" spellcheck="false" />
+  <div id="setup-error" style="color:#e05;font-size:12px;margin-bottom:8px;min-height:16px;text-align:center;max-width:360px"></div>
+  <button class="btn-connect" id="btn-connect">Connect</button>
+  <div class="link-logout" id="btn-logout" style="display:none" onclick="logout()">Sign out</div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+  <div id="tabs">
+    <div class="tab active" id="tab-all"    onclick="switchTab('all')">All photos</div>
+    <div class="tab"        id="tab-album"  onclick="showAlbumPicker()" style="display:none">Albums ▾</div>
+    <div class="tab"        id="tab-locked" onclick="onLockedTab()">🔒 Private</div>
+  </div>
+  <div id="album-picker"></div>
+  <div id="content">
+    <div id="photos-container"></div>
+    <div id="loader">Loading...</div>
+  </div>
+  <div id="timeline"></div>
+</div>
+
+<!-- PIN modal -->
+<div id="pin-modal">
+  <h2>🔒 PRIVATE FOLDER</h2>
+  <p>Enter your PIN</p>
+  <input type="password" id="pin-input" placeholder="••••" maxlength="16"
+         autocomplete="off" autocorrect="off" autocapitalize="none" />
+  <div id="pin-error"></div>
+  <div class="pin-btn-row">
+    <button class="btn-pin-ok"     id="btn-pin-ok">Unlock</button>
+    <button class="btn-pin-cancel" onclick="closePinModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+  <div id="lb-close" onclick="closeLightbox()">×</div>
+  <img   id="lb-img"   src="" alt="" style="display:none" />
+  <video id="lb-video" controls playsinline style="display:none"></video>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+var API_KEY       = '';   // x-api-key header used for regular requests
+var SESSION_TOKEN = '';   // Bearer token from /auth/login, required for locked folder elevation
+var PAGE          = 1;
+var PG_SIZE       = 60;
+var busy          = false;
+var done          = false;
+var tab           = 'all';
+var albumId       = null;
+var pinVerified   = false; // true while the locked folder is unlocked in this session
+var albums        = [];
+var groups        = {};    // date-key (YYYY-MM) -> asset array
+var gOrder        = [];    // sorted array of date keys
+var gRendered     = {};    // tracks which date sections are already in the DOM
+var seenIds       = {};    // deduplication map: asset id -> true
+var COLS          = 4;
+
+var MO_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var MO_F = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+// Debounce / throttle handles
+var loadTimeout   = null;
+var scrollTimeout = null;
+
+// ── Authentication ──────────────────────────────────────────────────────────
+
+// Login: POST /api/auth/login to obtain a session token, then persist credentials
+document.getElementById('btn-connect').onclick = function() {
+  var email    = document.getElementById('cfg-email').value.trim();
+  var password = document.getElementById('cfg-password').value;
+  var apiKey   = document.getElementById('cfg-key').value.trim();
+
+  if (!email || !password) { showSetupError('Please enter your email and password'); return; }
+
+  showSetupError('');
+  document.getElementById('btn-connect').textContent = '...';
+  document.getElementById('btn-connect').disabled    = true;
+
+  postNoAuth('/api/auth/login', { email: email, password: password }, function(err, data) {
+    document.getElementById('btn-connect').textContent = 'Connect';
+    document.getElementById('btn-connect').disabled    = false;
+
+    if (err || !data || !data.accessToken) {
+      showSetupError('Invalid email or password');
+      return;
+    }
+
+    SESSION_TOKEN = data.accessToken;
+    // Use an explicit API key if provided, otherwise fall back to the session token
+    API_KEY = apiKey || SESSION_TOKEN;
+
+    localStorage.setItem('ik',  API_KEY);
+    localStorage.setItem('ist', SESSION_TOKEN);
+    startApp();
+  });
+};
+
+function showSetupError(msg) {
+  document.getElementById('setup-error').textContent = msg;
+}
+
+// Load saved credentials from localStorage (avoids re-login on page refresh)
+function loadCfg() {
+  API_KEY       = localStorage.getItem('ik')  || '';
+  SESSION_TOKEN = localStorage.getItem('ist') || '';
+  return !!(API_KEY && SESSION_TOKEN);
+}
+
+function logout() {
+  localStorage.removeItem('ik');
+  localStorage.removeItem('ist');
+  location.reload();
+}
+
+// ── HTTP helpers ────────────────────────────────────────────────────────────
+
+// Unauthenticated POST — used only for /api/auth/login
+function postNoAuth(path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', path, true);
+  x.setRequestHeader('Content-Type', 'application/json');
+  x.setRequestHeader('Accept',       'application/json');
+  x.onload = function() {
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, JSON.parse(x.responseText)); }
+      catch(e) { cb(new Error('Parse error')); }
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.onerror = function() { cb(new Error('Network error')); };
+  x.send(JSON.stringify(body));
+}
+
+// Session-authenticated POST — uses Bearer token (required for locked folder)
+function postSession(path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', path, true);
+  x.setRequestHeader('Authorization', 'Bearer ' + SESSION_TOKEN);
+  x.setRequestHeader('Content-Type',  'application/json');
+  x.setRequestHeader('Accept',        'application/json');
+  x.onload = function() {
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, x.responseText ? JSON.parse(x.responseText) : {}); }
+      catch(e) { cb(null, {}); } // 200 with empty body is still a success
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.onerror = function() { cb(new Error('Network error')); };
+  x.send(JSON.stringify(body));
+}
+
+// API-key GET
+function get(path, cb) {
+  var x = new XMLHttpRequest();
+  x.open('GET', path, true);
+  x.setRequestHeader('x-api-key', API_KEY);
+  x.setRequestHeader('Accept',    'application/json');
+  x.onload = function() {
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, JSON.parse(x.responseText)); }
+      catch(e) { cb(new Error('Parse error')); }
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.onerror = function() { cb(new Error('Network error')); };
+  x.send();
+}
+
+// API-key POST
+function post(path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', path, true);
+  x.setRequestHeader('x-api-key',    API_KEY);
+  x.setRequestHeader('Content-Type', 'application/json');
+  x.setRequestHeader('Accept',       'application/json');
+  x.onload = function() {
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, JSON.parse(x.responseText)); }
+      catch(e) { cb(new Error('Parse error')); }
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.onerror = function() { cb(new Error('Network error')); };
+  x.send(JSON.stringify(body));
+}
+
+// ── URL builders ────────────────────────────────────────────────────────────
+
+function thumbUrl(id) {
+  return '/api/assets/' + id + '/thumbnail?size=preview&apiKey=' + encodeURIComponent(API_KEY);
+}
+function videoUrl(id) {
+  return '/api/assets/' + id + '/video/playback?apiKey=' + encodeURIComponent(API_KEY);
+}
+
+// ── App boot ────────────────────────────────────────────────────────────────
+
+function startApp() {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('app').style.display   = 'block';
+  fetchAlbums();
+  reset();
+}
+
+// ── Albums ──────────────────────────────────────────────────────────────────
+
+// Fetch the user's albums and populate the dropdown picker
+function fetchAlbums() {
+  get('/api/albums', function(err, data) {
+    if (err || !data || !data.length) return;
+    albums = data;
+    document.getElementById('tab-album').style.display = '';
+    var picker = document.getElementById('album-picker');
+    picker.innerHTML = '';
+    for (var i = 0; i < albums.length; i++) {
+      (function(a) {
+        var d = document.createElement('div');
+        d.className = 'album-item';
+        d.innerHTML = '<div class="album-item-name">'  + esc(a.albumName) + '</div>' +
+                      '<div class="album-item-count">' + (a.assetCount || '?') + ' items</div>';
+        d.onclick = function() { pickAlbum(a.id, a.albumName); };
+        picker.appendChild(d);
+      })(albums[i]);
+    }
+  });
+}
+
+function showAlbumPicker() {
+  var p = document.getElementById('album-picker');
+  p.className = p.className === 'open' ? '' : 'open';
+}
+
+function pickAlbum(id, name) {
+  document.getElementById('album-picker').className = '';
+  albumId = id;
+  document.getElementById('tab-album').textContent = name + ' ▾';
+  switchTab('album');
+}
+
+// ── Tab switching ───────────────────────────────────────────────────────────
+
+function switchTab(t) {
+  tab = t;
+  document.getElementById('tab-all').className    = 'tab' + (t === 'all'    ? ' active' : '');
+  document.getElementById('tab-album').className  = 'tab' + (t === 'album'  ? ' active' : '');
+  document.getElementById('tab-locked').className = 'tab' + (t === 'locked' ? ' active' : '');
+
+  // Update lock icon based on whether private folder is active
+  if (t === 'locked') {
+    document.getElementById('tab-locked').textContent = '🔓 Private';
+  } else if (pinVerified) {
+    pinVerified = false;
+    document.getElementById('tab-locked').textContent = '🔒 Private';
+  }
+
+  reset();
+}
+
+// ── Locked folder ───────────────────────────────────────────────────────────
+
+// Handle taps on the Private tab: lock if active, prompt PIN if not yet unlocked, else switch
+function onLockedTab() {
+  if (tab === 'locked') {
+    pinVerified = false;
+    document.getElementById('tab-locked').textContent = '🔒 Private';
+    switchTab('all');
+    return;
+  }
+  if (pinVerified) { switchTab('locked'); return; }
+  openPinModal();
+}
+
+function openPinModal() {
+  document.getElementById('pin-input').value       = '';
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('pin-modal').className   = 'open';
+  setTimeout(function() { document.getElementById('pin-input').focus(); }, 100);
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').className = '';
+  document.getElementById('pin-input').value     = '';
+}
+
+// Submit PIN: calls /api/auth/session/unlock to elevate the current session
+function submitPin() {
+  var pin = document.getElementById('pin-input').value.trim();
+  if (!pin) return;
+  document.getElementById('pin-error').textContent  = '';
+  document.getElementById('btn-pin-ok').disabled    = true;
+  document.getElementById('btn-pin-ok').textContent = '...';
+
+  postSession('/api/auth/session/unlock', { pinCode: pin }, function(err) {
+    document.getElementById('btn-pin-ok').disabled    = false;
+    document.getElementById('btn-pin-ok').textContent = 'Unlock';
+    if (err) {
+      document.getElementById('pin-error').textContent = 'Incorrect PIN';
+      document.getElementById('pin-input').value       = '';
+      document.getElementById('pin-input').focus();
+      return;
+    }
+    pinVerified = true;
+    closePinModal();
+    switchTab('locked');
+  });
+}
+
+document.getElementById('btn-pin-ok').onclick = submitPin;
+
+// Keyboard shortcuts inside the PIN input
+document.getElementById('pin-input').onkeydown = function(e) {
+  var key = e.keyCode || e.which;
+  if (key === 13) { submitPin(); }
+  if (key === 27) { closePinModal(); }
+};
+
+// ── Data loading ────────────────────────────────────────────────────────────
+
+// Reset all state and restart loading for the active tab
+function reset() {
+  if (loadTimeout) { clearTimeout(loadTimeout); loadTimeout = null; }
+  PAGE      = 1;
+  busy      = false;
+  done      = false;
+  groups    = {};
+  gOrder    = [];
+  gRendered = {};
+  seenIds   = {};
+  document.getElementById('photos-container').innerHTML = '';
+  document.getElementById('timeline').innerHTML         = '';
+  document.getElementById('loader').textContent         = 'Loading...';
+  load();
+}
+
+// Debounced entry point — prevents rapid repeated calls during fast scrolling
+function load() {
+  if (busy || done) return;
+  if (loadTimeout) clearTimeout(loadTimeout);
+  loadTimeout = setTimeout(function() { doLoad(); }, 200);
+}
+
+// Perform the actual API request for the next page of assets
+function doLoad() {
+  if (busy || done) return;
+  busy = true;
+
+  // Album tab: fetch all assets in the selected album in a single request
+  if (tab === 'album' && albumId) {
+    get('/api/albums/' + albumId, function(err, data) {
+      busy = false;
+      if (err) { document.getElementById('loader').textContent = 'Error: ' + err.message; return; }
+      var assets = (data && data.assets) ? data.assets : (Array.isArray(data) ? data : []);
+      ingest(assets);
+      render();
+      buildTimeline();
+      done = true;
+      document.getElementById('loader').textContent = 'All loaded';
+    });
+    return;
+  }
+
+  // All photos / Locked folder: paginated metadata search
+  var body = { size: PG_SIZE, page: PAGE };
+
+  // Locked folder requires a visibility filter and a session-elevated request
+  if (tab === 'locked') {
+    body.visibility = 'locked';
+    postSession('/api/search/metadata', body, handleSearchResult);
+    return;
+  }
+
+  post('/api/search/metadata', body, handleSearchResult);
+
+  function handleSearchResult(err, data) {
+    busy = false;
+
+    if (err) { document.getElementById('loader').textContent = 'Error: ' + err.message; return; }
+
+    var assets = (data && data.assets && data.assets.items) ? data.assets.items : [];
+
+    if (!assets.length) {
+      done = true;
+      document.getElementById('loader').textContent = 'All loaded';
+      return;
+    }
+
+    PAGE++;
+    ingest(assets);
+    render();
+    buildTimeline();
+
+    if (!data.assets.nextPage) {
+      done = true;
+      document.getElementById('loader').textContent = 'All loaded';
+    } else {
+      document.getElementById('loader').textContent = '';
+    }
+  }
+}
+
+// ── Asset ingestion ─────────────────────────────────────────────────────────
+
+// Group incoming assets by month (YYYY-MM key), skipping duplicates
+function ingest(assets) {
+  for (var i = 0; i < assets.length; i++) {
+    var a = assets[i];
+    if (seenIds[a.id]) continue;
+    seenIds[a.id] = true;
+
+    var raw = a.fileCreatedAt || a.localDateTime || a.createdAt || '';
+    var key = raw ? raw.substring(0, 7) : '0000-00';
+    if (!groups[key]) { groups[key] = []; gOrder.push(key); }
+    groups[key].push(a);
+  }
+  // Keep newest months at the top
+  gOrder.sort(function(a, b) { return b.localeCompare(a); });
+}
+
+// ── Grid renderer ───────────────────────────────────────────────────────────
+
+// Insert newly ingested date sections into the DOM in descending date order
+function render() {
+  var cont = document.getElementById('photos-container');
+  for (var i = 0; i < gOrder.length; i++) {
+    var key = gOrder[i];
+    if (gRendered[key]) continue;
+    gRendered[key] = true;
+
+    var sec = document.createElement('div');
+    sec.id  = 'g-' + key;
+
+    var lbl = document.createElement('div');
+    lbl.className   = 'date-label';
+    lbl.textContent = fmtKey(key);
+    sec.appendChild(lbl);
+
+    var arr = groups[key];
+    for (var j = 0; j < arr.length; j += COLS) {
+      var row = document.createElement('div');
+      row.className = 'photo-row';
+      var cnt = Math.min(COLS, arr.length - j);
+      for (var k = 0; k < cnt; k++) { row.appendChild(mkCell(arr[j + k])); }
+      for (var k = cnt; k < COLS; k++) { var f = document.createElement('div'); f.className = 'photo-cell-filler'; row.appendChild(f); }
+      sec.appendChild(row);
+    }
+
+    // Insert before the first section that is older than the current key
+    var placed = false;
+    var kids   = cont.children;
+    for (var x = 0; x < kids.length; x++) {
+      if (kids[x].id && kids[x].id < 'g-' + key) {
+        cont.insertBefore(sec, kids[x]);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) cont.appendChild(sec);
+  }
+}
+
+// Build a single thumbnail cell; adds a video badge for video assets
+function mkCell(a) {
+  var cell  = document.createElement('div');
+  cell.className = 'photo-cell';
+  var inner = document.createElement('div');
+  inner.className = 'photo-cell-inner';
+  var img   = document.createElement('img');
+  img.src   = thumbUrl(a.id);
+  inner.appendChild(img);
+  if (a.type === 'VIDEO') {
+    var b = document.createElement('span');
+    b.className   = 'video-mark';
+    b.textContent = '▶';
+    inner.appendChild(b);
+  }
+  cell.appendChild(inner);
+  cell.onclick = (function(asset) {
+    return function() { openLightbox(asset); };
+  })(a);
+  return cell;
+}
+
+// ── Scrubber timeline ───────────────────────────────────────────────────────
+
+// Rebuild the right-side year/month scrubber from the current gOrder
+function buildTimeline() {
+  var tl    = document.getElementById('timeline');
+  tl.innerHTML = '';
+  var lastY = '';
+  for (var i = 0; i < gOrder.length; i++) {
+    var key = gOrder[i];
+    if (key === '0000-00') continue;
+    var y = key.substring(0, 4);
+    var m = parseInt(key.substring(5, 7), 10) - 1;
+    if (y !== lastY) {
+      var yd = document.createElement('div');
+      yd.className   = 'tl-year';
+      yd.textContent = y;
+      yd.onclick = (function(k) { return function() { scrollToGroup(k); }; })(key);
+      tl.appendChild(yd);
+      lastY = y;
+    }
+    var md = document.createElement('div');
+    md.className   = 'tl-month';
+    md.textContent = MO_S[m].charAt(0);
+    md.title       = MO_F[m] + ' ' + y;
+    md.onclick = (function(k) { return function() { scrollToGroup(k); }; })(key);
+    tl.appendChild(md);
+  }
+}
+
+// Scroll the page to a given date group
+function scrollToGroup(key) {
+  var el = document.getElementById('g-' + key);
+  if (el) window.scrollTo(0, el.getBoundingClientRect().top + window.pageYOffset - 56);
+}
+
+// ── Lightbox ────────────────────────────────────────────────────────────────
+
+function openLightbox(a) {
+  var lb  = document.getElementById('lightbox');
+  var img = document.getElementById('lb-img');
+  var vid = document.getElementById('lb-video');
+  img.style.display = 'none';
+  vid.style.display = 'none';
+  vid.src = '';
+  if (a.type === 'VIDEO') {
+    vid.src = videoUrl(a.id);
+    vid.style.display = 'block';
+  } else {
+    img.src = thumbUrl(a.id);
+    img.style.display = 'block';
+  }
+  lb.className = 'open';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').className = '';
+  var vid = document.getElementById('lb-video');
+  vid.pause();
+  vid.src = '';
+  document.getElementById('lb-img').src = '';
+}
+
+// ── Utility helpers ─────────────────────────────────────────────────────────
+
+// Format a YYYY-MM key into a human-readable month label
+function fmtKey(k) {
+  if (k === '0000-00') return 'Unknown date';
+  return MO_F[parseInt(k.substring(5, 7), 10) - 1] + ' ' + k.substring(0, 4);
+}
+
+// Escape HTML special characters to prevent XSS in album names
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+// ── Event listeners ─────────────────────────────────────────────────────────
+
+// Infinite scroll: trigger load when within 1500px of the bottom (throttled to 300ms)
+window.addEventListener('scroll', function() {
+  if (scrollTimeout) return;
+  scrollTimeout = setTimeout(function() {
+    scrollTimeout = null;
+    if (window.pageYOffset + window.innerHeight >= document.body.scrollHeight - 1500) {
+      load();
+    }
+  }, 300);
+});
+
+// Close album picker when tapping outside it
+document.addEventListener('click', function(e) {
+  var p = document.getElementById('album-picker');
+  var t = document.getElementById('tab-album');
+  if (p.className === 'open' && e.target !== t && !p.contains(e.target)) {
+    p.className = '';
+  }
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+
+// Restore saved session and skip the login screen if credentials exist in localStorage
+if (loadCfg()) {
+  document.getElementById('btn-logout').style.display = '';
+  document.getElementById('cfg-key').value            = API_KEY;
+  startApp();
+}
+</script>
+</body>
+</html>

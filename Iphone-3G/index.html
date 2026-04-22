@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Immich Lite</title>
+<style>
+* { -webkit-box-sizing: border-box; box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #000;
+  color: #fff;
+  font-family: Helvetica, Arial, sans-serif;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Login screen ── */
+#setup {
+  padding: 2rem 1.5rem;
+  text-align: center;
+  min-height: 100%;
+}
+#setup h1 { font-size: 1.8rem; letter-spacing: 5px; color: #e6aa25; margin-bottom: 0.3rem; }
+#setup p  { color: #555; font-size: 0.8rem; margin-bottom: 1.5rem; line-height: 1.5; }
+#setup input {
+  display: block;
+  width: 100%;
+  padding: 13px 14px;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  -webkit-border-radius: 8px; border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  margin-bottom: 10px;
+  outline: none;
+  -webkit-appearance: none;
+}
+#setup .btn-connect {
+  display: block;
+  width: 100%;
+  padding: 13px;
+  background: #e6aa25;
+  border: none;
+  -webkit-border-radius: 8px; border-radius: 8px;
+  color: #000;
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 4px;
+}
+.link-logout { margin-top: 1rem; color: #444; font-size: 12px; }
+#setup-error { color: #ee0055; font-size: 12px; min-height: 16px; margin-bottom: 8px; }
+
+/* ── App shell ── */
+#app { display: none; }
+
+/* ── Tab bar — two rows, float-based layout ──
+   position:fixed is broken during scroll in iOS 4, so tabs live in
+   the document flow. Float + clear:both gives us reliable stacking. ── */
+#tabs {
+  background: #0a0a0a;
+  border-bottom: 1px solid #1c1c1c;
+  overflow: hidden; /* clearfix */
+}
+#tabs-row1,
+#tabs-row2 {
+  float: left;
+  width: 100%;
+  clear: both;
+  text-align: center;
+  padding: 3px 8px;
+  min-height: 36px;
+}
+.tab {
+  display: block;
+  width: 140px;
+  margin: 0 auto;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: #666;
+  text-align: center;
+  -webkit-border-radius: 18px;
+  border-radius: 18px;
+}
+.tab.active { background: #e6aa25; color: #000; font-weight: bold; }
+
+/* ── Album picker dropdown ── */
+#album-picker { display: none; border-bottom: 1px solid #1c1c1c; background: #0d0d0d; }
+#album-picker.open { display: block; }
+.album-item { padding: 12px 14px; border-bottom: 1px solid #1a1a1a; }
+.album-item-name  { font-size: 14px; color: #ddd; }
+.album-item-count { font-size: 11px; color: #555; margin-top: 2px; }
+/* Private item gets a gold tint to stand out from regular albums */
+.album-item-private .album-item-name  { color: #e6aa25; }
+.album-item-private .album-item-count { color: #554400; }
+
+/* ── Date group label ── */
+.date-label {
+  padding: 9px 8px 3px;
+  font-size: 11px;
+  color: #555;
+  font-weight: bold;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+
+/* ── Photo grid — 3 columns with square cells ──
+   Uses padding-bottom:100% trick instead of object-fit (not supported
+   in iOS 4). Cells use the 2009 WebKit box model, not modern flexbox. ── */
+.photo-row {
+  display: -webkit-box;
+  display: -moz-box;
+  display: box;
+  -webkit-box-orient: horizontal;
+  -moz-box-orient: horizontal;
+  box-orient: horizontal;
+  -webkit-box-pack: start;
+  gap: 2px;
+  margin-bottom: 2px;
+}
+.photo-cell {
+  -webkit-box-flex: 1;
+  -moz-box-flex: 1;
+  box-flex: 1;
+  position: relative;
+  background: #111;
+  overflow: hidden;
+}
+.photo-cell-inner {
+  width: 100%;
+  padding-bottom: 100%; /* forces square aspect ratio */
+  position: relative;
+  overflow: hidden;
+}
+.photo-cell img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  margin-top: -50%;  /* centers without object-fit */
+  margin-left: -50%;
+}
+.video-mark {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.7);
+  -webkit-border-radius: 3px; border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 9px;
+  color: #fff;
+}
+.photo-cell-filler {
+  -webkit-box-flex: 1;
+  -moz-box-flex: 1;
+  box-flex: 1;
+}
+
+/* ── Loader indicator ── */
+#loader { text-align: center; padding: 1.2rem; color: #444; font-size: 13px; }
+
+/* ── Horizontal timeline scrubber ──
+   Vertical fixed sidebar is unusable in iOS 4 (position:fixed breaks
+   during scroll). Instead we render a horizontal scrollable strip. ── */
+#timeline-wrap {
+  padding: 6px 8px;
+  background: #0a0a0a;
+  border-top: 1px solid #1c1c1c;
+  overflow-x: auto;
+  white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+.tl-year  { display: inline-block; padding: 4px 6px; font-size: 10px; color: #e6aa25; font-weight: bold; }
+.tl-month { display: inline-block; padding: 4px 5px; font-size: 10px; color: #555; }
+
+/* ── Lightbox ──
+   position:fixed is unreliable in iOS 4 during scroll, so we use
+   position:absolute and snap top to the current scrollTop in JS.     ── */
+#lightbox {
+  display: none;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  background: #000;
+  z-index: 200;
+  text-align: center;
+}
+#lightbox.open { display: block; }
+#lb-close {
+  display: block;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #e6aa25;
+  text-align: left;
+  border-bottom: 1px solid #1a1a1a;
+}
+#lb-img   { display: block; width: 100%; }
+#lb-video { display: block; width: 100%; }
+
+/* ── PIN modal — same absolute positioning strategy as lightbox ── */
+#pin-modal {
+  display: none;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  min-height: 100%;
+  background: rgba(0,0,0,0.95);
+  z-index: 300;
+  text-align: center;
+  padding: 3rem 2rem;
+}
+#pin-modal.open { display: block; }
+#pin-modal h2   { font-size: 1rem; letter-spacing: 3px; color: #e6aa25; margin-bottom: 0.3rem; }
+#pin-modal p    { color: #555; font-size: 0.8rem; margin-bottom: 1.2rem; }
+#pin-input {
+  width: 180px;
+  padding: 12px;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  -webkit-border-radius: 8px; border-radius: 8px;
+  color: #fff;
+  font-size: 20px;
+  letter-spacing: 7px;
+  text-align: center;
+  outline: none;
+  -webkit-appearance: none;
+  margin-bottom: 8px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+#pin-error { color: #ee0055; font-size: 12px; height: 14px; margin-bottom: 8px; }
+#btn-pin-ok {
+  padding: 11px 26px;
+  background: #e6aa25;
+  border: none;
+  -webkit-border-radius: 8px; border-radius: 8px;
+  color: #000;
+  font-size: 14px;
+  font-weight: bold;
+  margin-right: 8px;
+}
+#btn-pin-cancel {
+  padding: 11px 18px;
+  background: #1a1a1a;
+  border: none;
+  -webkit-border-radius: 8px; border-radius: 8px;
+  color: #666;
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<!-- Login screen -->
+<div id="setup">
+  <h1>IMMICH</h1>
+  <p>Sign in to your account<br><span style="color:#333;font-size:11px">Login required for the locked folder</span></p>
+  <input type="email"    id="cfg-email"    placeholder="Email"             autocapitalize="none" autocorrect="off" />
+  <input type="password" id="cfg-password" placeholder="Password" />
+  <input type="text"     id="cfg-key"      placeholder="API Key (optional)" autocapitalize="none" autocorrect="off" />
+  <div id="setup-error"></div>
+  <button class="btn-connect" id="btn-connect">Connect</button>
+  <div class="link-logout" id="btn-logout" style="display:none" onclick="logout()">Sign out</div>
+</div>
+
+<!-- Main app -->
+<div id="app">
+
+  <!-- Two-row tab bar: All photos on top, Albums (+ Private inside) below -->
+  <div id="tabs">
+    <div id="tabs-row1">
+      <div class="tab active" id="tab-all" onclick="switchTab('all')">All photos</div>
+    </div>
+    <div id="tabs-row2">
+      <div class="tab" id="tab-album" onclick="showAlbumPicker()">Albums &#9662;</div>
+    </div>
+  </div>
+
+  <!-- Album picker — Private folder is always the first item -->
+  <div id="album-picker"></div>
+
+  <!-- Horizontal timeline scrubber -->
+  <div id="timeline-wrap"></div>
+
+  <div id="content">
+    <div id="photos-container"></div>
+    <div id="loader">Loading...</div>
+  </div>
+
+</div>
+
+<!-- PIN modal for the locked folder -->
+<div id="pin-modal">
+  <h2>&#128274; PRIVATE FOLDER</h2>
+  <p>Enter your PIN</p>
+  <input type="password" id="pin-input" placeholder="&#8226;&#8226;&#8226;&#8226;" maxlength="16"
+         autocomplete="off" autocorrect="off" autocapitalize="none" />
+  <div id="pin-error"></div>
+  <button id="btn-pin-ok">Unlock</button>
+  <button id="btn-pin-cancel" onclick="closePinModal()">Cancel</button>
+</div>
+
+<!-- Full-screen lightbox -->
+<div id="lightbox">
+  <span id="lb-close" onclick="closeLightbox()">&#8592; Back</span>
+  <img   id="lb-img"   src="" alt="" style="display:none" />
+  <video id="lb-video" controls style="display:none"></video>
+</div>
+
+<script>
+// ── ES3 polyfills ────────────────────────────────────────────────────────────
+// iOS 4 / WebKit 533 ships with ES3. These methods were added in ES5,
+// so we patch them before any other code runs.
+
+if (!String.prototype.trim) {
+  String.prototype.trim = function() {
+    return this.replace(/^\s+|\s+$/g, '');
+  };
+}
+
+if (!Array.prototype.indexOf) {
+  Array.prototype.indexOf = function(val) {
+    for (var i = 0; i < this.length; i++) {
+      if (this[i] === val) return i;
+    }
+    return -1;
+  };
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+var API_KEY       = '';   // x-api-key header for regular requests
+var SESSION_TOKEN = '';   // Bearer token from /auth/login, needed for locked folder
+var PAGE          = 1;
+var PG_SIZE       = 20;   // Small page size — iPhone 3G has 128 MB RAM and a slow CPU
+var busy          = false;
+var done          = false;
+var tab           = 'all';
+var albumId       = null;
+var pinVerified   = false; // true while locked folder is unlocked in this session
+var albums        = [];
+var groups        = {};   // date-key (YYYY-MM) -> array of assets
+var gOrder        = [];   // sorted array of date keys, newest first
+var gRendered     = {};   // tracks which date sections are already in the DOM
+var seenIds       = {};   // deduplication map: asset id -> true
+var COLS          = 3;    // 3 columns give larger tap targets on a 3.5" screen
+
+var MO_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var MO_F = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+var loadTimeout = null;
+
+// ── Authentication ──────────────────────────────────────────────────────────
+
+// POST /api/auth/login to get a session token, then persist both tokens
+document.getElementById('btn-connect').onclick = function() {
+  var email    = document.getElementById('cfg-email').value.trim();
+  var password = document.getElementById('cfg-password').value;
+  var apiKey   = document.getElementById('cfg-key').value.trim();
+
+  if (!email || !password) { showSetupError('Please enter your email and password'); return; }
+
+  showSetupError('');
+  document.getElementById('btn-connect').disabled = true;
+
+  postNoAuth('/api/auth/login', { email: email, password: password }, function(err, data) {
+    document.getElementById('btn-connect').disabled = false;
+
+    if (err || !data || !data.accessToken) {
+      showSetupError('Invalid email or password');
+      return;
+    }
+
+    SESSION_TOKEN = data.accessToken;
+    // Use an explicit API key if provided, otherwise fall back to the session token
+    API_KEY = apiKey || SESSION_TOKEN;
+
+    localStorage.setItem('ik',  API_KEY);
+    localStorage.setItem('ist', SESSION_TOKEN);
+    startApp();
+  });
+};
+
+function showSetupError(msg) {
+  document.getElementById('setup-error').textContent = msg;
+}
+
+// Restore saved credentials from localStorage (skip login on page reload)
+function loadCfg() {
+  API_KEY       = localStorage.getItem('ik')  || '';
+  SESSION_TOKEN = localStorage.getItem('ist') || '';
+  return !!(API_KEY && SESSION_TOKEN);
+}
+
+function logout() {
+  localStorage.removeItem('ik');
+  localStorage.removeItem('ist');
+  location.reload();
+}
+
+// ── HTTP helpers ────────────────────────────────────────────────────────────
+// All XHR uses onreadystatechange instead of onload — onload is not
+// reliable in iOS 4 Safari.
+
+// Unauthenticated POST — used only for /api/auth/login
+function postNoAuth(path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', path, true);
+  x.setRequestHeader('Content-Type', 'application/json');
+  x.setRequestHeader('Accept',       'application/json');
+  x.onreadystatechange = function() {
+    if (x.readyState !== 4) return;
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, JSON.parse(x.responseText)); }
+      catch(e) { cb(new Error('Parse error')); }
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.send(JSON.stringify(body));
+}
+
+// Session-authenticated POST — Bearer token, required for locked folder
+function postSession(path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', path, true);
+  x.setRequestHeader('Authorization', 'Bearer ' + SESSION_TOKEN);
+  x.setRequestHeader('Content-Type',  'application/json');
+  x.setRequestHeader('Accept',        'application/json');
+  x.onreadystatechange = function() {
+    if (x.readyState !== 4) return;
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, x.responseText ? JSON.parse(x.responseText) : {}); }
+      catch(e) { cb(null, {}); } // 200 with empty body is still a success
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.send(JSON.stringify(body));
+}
+
+// API-key GET
+function get(path, cb) {
+  var x = new XMLHttpRequest();
+  x.open('GET', path, true);
+  x.setRequestHeader('x-api-key', API_KEY);
+  x.setRequestHeader('Accept',    'application/json');
+  x.onreadystatechange = function() {
+    if (x.readyState !== 4) return;
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, JSON.parse(x.responseText)); }
+      catch(e) { cb(new Error('Parse error')); }
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.send();
+}
+
+// API-key POST
+function post(path, body, cb) {
+  var x = new XMLHttpRequest();
+  x.open('POST', path, true);
+  x.setRequestHeader('x-api-key',    API_KEY);
+  x.setRequestHeader('Content-Type', 'application/json');
+  x.setRequestHeader('Accept',       'application/json');
+  x.onreadystatechange = function() {
+    if (x.readyState !== 4) return;
+    if (x.status >= 200 && x.status < 300) {
+      try { cb(null, JSON.parse(x.responseText)); }
+      catch(e) { cb(new Error('Parse error')); }
+    } else { cb(new Error('HTTP ' + x.status)); }
+  };
+  x.send(JSON.stringify(body));
+}
+
+// ── URL builders ────────────────────────────────────────────────────────────
+
+function thumbUrl(id) {
+  return '/api/assets/' + id + '/thumbnail?size=preview&apiKey=' + encodeURIComponent(API_KEY);
+}
+function videoUrl(id) {
+  return '/api/assets/' + id + '/video/playback?apiKey=' + encodeURIComponent(API_KEY);
+}
+
+// ── App boot ────────────────────────────────────────────────────────────────
+
+function startApp() {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('app').style.display   = 'block';
+  fetchAlbums();
+  reset();
+}
+
+// ── Albums ──────────────────────────────────────────────────────────────────
+
+// Build the album picker. Private folder is always injected first regardless
+// of whether the API call succeeds, so it is always accessible.
+function fetchAlbums() {
+  var picker = document.getElementById('album-picker');
+  picker.innerHTML = '';
+
+  // Private folder — first item, PIN-gated
+  var priv = document.createElement('div');
+  priv.className = 'album-item album-item-private';
+  priv.innerHTML = '<div class="album-item-name">&#128274; Private</div>' +
+                   '<div class="album-item-count">Locked folder</div>';
+  priv.onclick = function() {
+    document.getElementById('album-picker').className = '';
+    if (pinVerified) {
+      switchTab('locked');
+    } else {
+      openPinModal();
+    }
+  };
+  picker.appendChild(priv);
+
+  // Regular albums from the API
+  get('/api/albums', function(err, data) {
+    if (err || !data || !data.length) return;
+    albums = data;
+    for (var i = 0; i < albums.length; i++) {
+      (function(a) {
+        var d = document.createElement('div');
+        d.className = 'album-item';
+        d.innerHTML = '<div class="album-item-name">'  + esc(a.albumName) + '</div>' +
+                      '<div class="album-item-count">' + (a.assetCount || '?') + ' items</div>';
+        d.onclick = function() { pickAlbum(a.id, a.albumName); };
+        picker.appendChild(d);
+      })(albums[i]);
+    }
+  });
+}
+
+function showAlbumPicker() {
+  var p = document.getElementById('album-picker');
+  p.className = p.className === 'open' ? '' : 'open';
+}
+
+function pickAlbum(id, name) {
+  document.getElementById('album-picker').className = '';
+  albumId = id;
+  document.getElementById('tab-album').textContent = name + ' \u25be';
+  switchTab('album');
+}
+
+// ── Tab switching ───────────────────────────────────────────────────────────
+
+function switchTab(t) {
+  tab = t;
+  document.getElementById('tab-all').className   = 'tab' + (t === 'all' ? ' active' : '');
+  // Albums tab stays highlighted when viewing an album or the locked folder
+  document.getElementById('tab-album').className = 'tab' + (t === 'album' || t === 'locked' ? ' active' : '');
+
+  // Reset album label and selection when going back to All photos
+  if (t === 'all') {
+    document.getElementById('tab-album').textContent = 'Albums \u25be';
+    albumId = null;
+  }
+
+  // Re-lock the private folder whenever the user navigates away from it
+  if (t !== 'locked' && pinVerified) {
+    pinVerified = false;
+  }
+
+  reset();
+}
+
+// ── Locked folder ───────────────────────────────────────────────────────────
+
+function openPinModal() {
+  document.getElementById('pin-input').value       = '';
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('pin-modal').className   = 'open';
+  // Scroll to top so the modal is visible — no fixed positioning in iOS 4
+  window.scrollTo(0, 0);
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').className = '';
+  document.getElementById('pin-input').value     = '';
+}
+
+// Submit PIN: calls /api/auth/session/unlock to elevate the current session
+function submitPin() {
+  var pin = document.getElementById('pin-input').value.trim();
+  if (!pin) return;
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('btn-pin-ok').disabled   = true;
+
+  postSession('/api/auth/session/unlock', { pinCode: pin }, function(err) {
+    document.getElementById('btn-pin-ok').disabled = false;
+    if (err) {
+      document.getElementById('pin-error').textContent = 'Incorrect PIN';
+      document.getElementById('pin-input').value       = '';
+      return;
+    }
+    pinVerified = true;
+    closePinModal();
+    switchTab('locked');
+  });
+}
+
+document.getElementById('btn-pin-ok').onclick    = submitPin;
+document.getElementById('btn-pin-cancel').onclick = closePinModal;
+
+// ── Data loading ────────────────────────────────────────────────────────────
+
+// Reset all state and restart loading for the active tab
+function reset() {
+  if (loadTimeout) { clearTimeout(loadTimeout); loadTimeout = null; }
+  PAGE      = 1;
+  busy      = false;
+  done      = false;
+  groups    = {};
+  gOrder    = [];
+  gRendered = {};
+  seenIds   = {};
+  document.getElementById('photos-container').innerHTML = '';
+  document.getElementById('timeline-wrap').innerHTML    = '';
+  document.getElementById('loader').textContent         = 'Loading...';
+  load();
+}
+
+// Debounced load entry point — prevents rapid duplicate calls
+function load() {
+  if (busy || done) return;
+  if (loadTimeout) clearTimeout(loadTimeout);
+  loadTimeout = setTimeout(function() { doLoad(); }, 150);
+}
+
+// Fetch the next page of assets from the API
+function doLoad() {
+  if (busy || done) return;
+  busy = true;
+  document.getElementById('loader').textContent = 'Loading...';
+
+  // Declare the callback before any branching — iOS 4 does not hoist
+  // function declarations inside conditional blocks reliably
+  var handleResult = function(err, data) {
+    busy = false;
+
+    if (err) {
+      document.getElementById('loader').textContent = 'Error: ' + err.message;
+      return;
+    }
+
+    var assets = (data && data.assets && data.assets.items) ? data.assets.items : [];
+
+    if (!assets.length) {
+      done = true;
+      document.getElementById('loader').textContent = 'All loaded';
+      return;
+    }
+
+    PAGE++;
+    ingest(assets);
+    render();
+    buildTimeline();
+
+    if (!data.assets.nextPage) {
+      done = true;
+      document.getElementById('loader').textContent = 'All loaded';
+    } else {
+      document.getElementById('loader').textContent = '';
+    }
+  };
+
+  // Album tab: fetch all assets in the selected album in one request
+  if (tab === 'album' && albumId) {
+    get('/api/albums/' + albumId, function(err, data) {
+      busy = false;
+      if (err) { document.getElementById('loader').textContent = 'Error: ' + err.message; return; }
+      var assets = (data && data.assets) ? data.assets : (Array.isArray(data) ? data : []);
+      ingest(assets);
+      render();
+      buildTimeline();
+      done = true;
+      document.getElementById('loader').textContent = 'All loaded';
+    });
+    return;
+  }
+
+  // All photos / Locked folder: paginated metadata search
+  var body = { size: PG_SIZE, page: PAGE };
+
+  // Locked folder requires a visibility filter and a session-elevated request
+  if (tab === 'locked') {
+    body.visibility = 'locked';
+    postSession('/api/search/metadata', body, handleResult);
+    return;
+  }
+
+  post('/api/search/metadata', body, handleResult);
+}
+
+// ── Asset ingestion ─────────────────────────────────────────────────────────
+
+// Group assets by month (YYYY-MM key), skipping duplicates
+function ingest(assets) {
+  for (var i = 0; i < assets.length; i++) {
+    var a = assets[i];
+    if (seenIds[a.id]) continue;
+    seenIds[a.id] = true;
+
+    var raw = a.fileCreatedAt || a.localDateTime || a.createdAt || '';
+    var key = raw ? raw.substring(0, 7) : '0000-00';
+    if (!groups[key]) { groups[key] = []; gOrder.push(key); }
+    groups[key].push(a);
+  }
+  // Keep newest months at the top
+  gOrder.sort(function(a, b) { return b < a ? -1 : b > a ? 1 : 0; });
+}
+
+// ── Grid renderer ───────────────────────────────────────────────────────────
+
+// Insert newly ingested date sections into the DOM in descending date order
+function render() {
+  var cont = document.getElementById('photos-container');
+  for (var i = 0; i < gOrder.length; i++) {
+    var key = gOrder[i];
+    if (gRendered[key]) continue;
+    gRendered[key] = true;
+
+    var sec = document.createElement('div');
+    sec.id  = 'g-' + key;
+
+    var lbl = document.createElement('div');
+    lbl.className   = 'date-label';
+    lbl.textContent = fmtKey(key);
+    sec.appendChild(lbl);
+
+    var arr = groups[key];
+    for (var j = 0; j < arr.length; j += COLS) {
+      var row = document.createElement('div');
+      row.className = 'photo-row';
+      var cnt = Math.min(COLS, arr.length - j);
+      for (var k = 0; k < cnt; k++) { row.appendChild(mkCell(arr[j + k])); }
+      // Fill the last row with empty cells so the grid stays aligned
+      for (var k = cnt; k < COLS; k++) {
+        var f = document.createElement('div');
+        f.className = 'photo-cell-filler';
+        row.appendChild(f);
+      }
+      sec.appendChild(row);
+    }
+
+    // Insert before the first section that is older than the current key
+    var placed = false;
+    var kids   = cont.children;
+    for (var x = 0; x < kids.length; x++) {
+      if (kids[x].id && kids[x].id < 'g-' + key) {
+        cont.insertBefore(sec, kids[x]);
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) cont.appendChild(sec);
+  }
+}
+
+// Build a single square thumbnail cell
+function mkCell(a) {
+  var cell  = document.createElement('div');
+  cell.className = 'photo-cell';
+  var inner = document.createElement('div');
+  inner.className = 'photo-cell-inner';
+  var img = document.createElement('img');
+  img.src = thumbUrl(a.id);
+  inner.appendChild(img);
+  if (a.type === 'VIDEO') {
+    var b = document.createElement('span');
+    b.className   = 'video-mark';
+    b.textContent = '\u25b6';
+    inner.appendChild(b);
+  }
+  cell.appendChild(inner);
+  cell.onclick = (function(asset) {
+    return function() { openLightbox(asset); };
+  })(a);
+  return cell;
+}
+
+// ── Timeline scrubber ───────────────────────────────────────────────────────
+
+// Rebuild the horizontal year/month strip from the current gOrder
+function buildTimeline() {
+  var tl    = document.getElementById('timeline-wrap');
+  tl.innerHTML = '';
+  var lastY = '';
+  for (var i = 0; i < gOrder.length; i++) {
+    var key = gOrder[i];
+    if (key === '0000-00') continue;
+    var y = key.substring(0, 4);
+    var m = parseInt(key.substring(5, 7), 10) - 1;
+    if (y !== lastY) {
+      var yd = document.createElement('span');
+      yd.className   = 'tl-year';
+      yd.textContent = y;
+      yd.onclick = (function(k) { return function() { scrollToGroup(k); }; })(key);
+      tl.appendChild(yd);
+      lastY = y;
+    }
+    var md = document.createElement('span');
+    md.className   = 'tl-month';
+    md.textContent = MO_S[m];
+    md.title       = MO_F[m] + ' ' + y;
+    md.onclick = (function(k) { return function() { scrollToGroup(k); }; })(key);
+    tl.appendChild(md);
+  }
+}
+
+// Scroll the page to a given date group
+function scrollToGroup(key) {
+  var el = document.getElementById('g-' + key);
+  if (el) window.scrollTo(0, el.offsetTop);
+}
+
+// ── Lightbox ────────────────────────────────────────────────────────────────
+
+function openLightbox(a) {
+  var lb  = document.getElementById('lightbox');
+  var img = document.getElementById('lb-img');
+  var vid = document.getElementById('lb-video');
+  img.style.display = 'none';
+  vid.style.display = 'none';
+  vid.src = '';
+
+  // Snap the absolute-positioned lightbox to the current viewport
+  lb.style.top       = document.body.scrollTop + 'px';
+  lb.style.minHeight = window.innerHeight + 'px';
+
+  if (a.type === 'VIDEO') {
+    vid.src = videoUrl(a.id);
+    vid.style.display = 'block';
+  } else {
+    img.src = thumbUrl(a.id);
+    img.style.display = 'block';
+  }
+  lb.className = 'open';
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').className = '';
+  var vid = document.getElementById('lb-video');
+  vid.pause();
+  vid.src = '';
+  document.getElementById('lb-img').src = '';
+}
+
+// ── Utility helpers ─────────────────────────────────────────────────────────
+
+function fmtKey(k) {
+  if (k === '0000-00') return 'Unknown date';
+  return MO_F[parseInt(k.substring(5, 7), 10) - 1] + ' ' + k.substring(0, 4);
+}
+
+// Escape HTML special characters to prevent XSS in album names
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Event listeners ─────────────────────────────────────────────────────────
+
+// Close album picker when tapping outside it
+document.onclick = function(e) {
+  var p = document.getElementById('album-picker');
+  var t = document.getElementById('tab-album');
+  if (p && p.className === 'open' && e.target !== t && !p.contains(e.target)) {
+    p.className = '';
+  }
+};
+
+// ── Scroll polling ──────────────────────────────────────────────────────────
+// iOS 4 only fires scroll events after momentum stops, making event-based
+// infinite scroll useless. Instead we poll every 500ms and trigger a load
+// when within 200px of the bottom of the document.
+setInterval(function() {
+  if (busy || done) return;
+  var scrollBottom = document.body.scrollTop + window.innerHeight;
+  var docHeight    = document.body.scrollHeight;
+  if (scrollBottom >= docHeight - 200) {
+    load();
+  }
+}, 500);
+
+// ── Init ────────────────────────────────────────────────────────────────────
+
+// Restore saved session and skip the login screen if credentials exist
+if (loadCfg()) {
+  document.getElementById('btn-logout').style.display = '';
+  startApp();
+}
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ services:
     container_name: immich-for-3G
     restart: unless-stopped
     ports:
-      - 8090:80
+      - 8100:80
     environment:
       - IMMICH_URL=http://X.X.X.X:PORT
     volumes:

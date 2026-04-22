@@ -1,0 +1,15 @@
+services:
+  immich-lite:
+    image: nginx:alpine
+    container_name: immich-for-3G
+    restart: unless-stopped
+    ports:
+      - 8090:80
+    environment:
+      - IMMICH_URL=http://X.X.X.X:PORT
+    volumes:
+      - /opt/immich-for-3G:/usr/share/nginx/html:ro
+      - /opt/immich-for-3G/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+networks:
+  immich_default:
+    external: true

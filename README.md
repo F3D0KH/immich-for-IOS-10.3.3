@@ -1,6 +1,6 @@
-# Immich Lite — Immich viewer for legacy devices (iOS 10 / WebKit 4)
+# Immich Legacy — Immich viewer for legacy devices. Now supports Ipad 4 & Iphone 3G
 
-A lightweight, single-file web client for [Immich](https://immich.app) built specifically for old devices that cannot run the official interface — such as the iPad 4 (2012) running iOS 10.3.3.
+A lightweight, single-file web client for [Immich](https://immich.app) built specifically for old devices that cannot run the official interface — such as the iPad 4 (2012) running iOS 10.3.3 or Iphone 3G (2008) running IOS 4.2.1.
 
 ---
 
@@ -8,14 +8,14 @@ A lightweight, single-file web client for [Immich](https://immich.app) built spe
 
 The official Immich web app is a modern React SPA that relies on ES2020+ JavaScript, CSS Grid, and other APIs that old WebKit engines simply do not support. When an iPad 4 tries to open it, the page either fails silently or renders broken — because its WebKit 4 engine (shipped with iOS 10) has no idea what to do with that code.
 
-Immich Lite solves this by sitting in front of Immich as a reverse proxy powered by **nginx**. Here is what happens on every request:
+Immich Legacy solves this by sitting in front of Immich as a reverse proxy powered by **nginx**. Here is what happens on every request:
 
 ```
 Old Device (iOS 10)
        │
        │  HTTP request → port 8090
        ▼
-  immich-lite (nginx)
+  immich-Legacy (nginx)
        │
        ├─ /api/* → proxied to your Immich server (port 2283)
        │            All API calls reach Immich unchanged.
@@ -26,7 +26,7 @@ Old Device (iOS 10)
                     everything old Safari can understand.
 ```
 
-Your old device talks to `immich-lite` on port 8090. nginx forwards every `/api/` request straight to your real Immich server, so all authentication, photo data, and media files come directly from your own instance. The only thing immich-lite serves is the HTML/JS/CSS shell.
+Your old device talks to `immich-Legacy` on port 8090/8100. nginx forwards every `/api/` request straight to your real Immich server, so all authentication, photo data, and media files come directly from your own instance. The only thing immich-Legacy serves is the HTML/JS/CSS shell.
 
 The UI is intentionally minimal — no build tools, no dependencies, just one HTML file.
 
@@ -47,7 +47,7 @@ The UI is intentionally minimal — no build tools, no dependencies, just one HT
 
 - A running [Immich](https://immich.app) instance on your local network
 - Docker (for the nginx container)
-- Any device with a browser — tested on iPad 4 / iOS 10.3.3 / Safari
+- Any device with a browser — tested on iPad 4 and Iphone 3G
 
 ---
 
@@ -55,32 +55,32 @@ The UI is intentionally minimal — no build tools, no dependencies, just one HT
 
 ### 1. Download the files
 
-Download `Page.html`, `nginx.conf.template`, and `compose.yaml` from this repository.
+Download `index.html`, `compose.yaml` from the  repository you need, nginx file same for all versions.
 
 ### 2. Configure compose.yaml
 
-Open `compose.yaml` and set `IMMICH_URL` to the address of your Immich server:
+Open `compose.yaml` and set `IMMICH_URL` to the address and port of your Immich server, and also names for container and directory:
 
 ```yaml
 services:
-  immich-lite:
+  immich-Legacy:
     image: nginx:alpine
-    container_name: immich-lite
+    container_name: immich-for-<your_device> <- your device
     restart: unless-stopped
     ports:
       - 8090:80
     environment:
-      - IMMICH_URL=http://192.168.1.129:2283  # <- your Immich address here
+      - IMMICH_URL=http://<your-server-ip>:PORT  # <- your Immich address and Port here
     volumes:
-      - /opt/immich-lite:/usr/share/nginx/html:ro
-      - /opt/immich-lite/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - /opt/immich-for-<device>:/usr/share/nginx/html:ro #                                            <-- change here
+      - /opt/immich-for-<device>/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro #   <-- and here name for your device
 
 networks:
   immich_default:  # <- immich lite need connect to real immich server
     external: true
 ```
 
-> **Important:** Make sure the `immich-lite` container is on the same Docker network as your Immich stack (`immich_default`). If your Immich uses a different network name, update it in `compose.yaml` accordingly.
+> **Important:** Make sure the `immich-Legacy` container is on the same Docker network as your Immich stack (`immich_default`). If your Immich uses a different network name, update it in `compose.yaml` accordingly.
 
 ### 3. Start the container once to create the directory
 
@@ -88,21 +88,21 @@ networks:
 docker compose up -d
 ```
 
-This creates `/opt/immich-lite/` on your host.
+This creates `/opt/immich-for-<device>/` on your host.
 
 ### 4. Copy the files into place
 
 ```bash
-sudo cp Page.html nginx.conf.template /opt/immich-lite/
+sudo cp index.html nginx.conf.template /opt/immich-for-<device>/
 ```
 
 ### 5. Restart the container
 
 ```bash
-docker compose restart immich-lite
+docker compose restart immich-for-<device>
 ```
 
-Open `http://<your-server-ip>:8090` on your old device. That's it.
+Open `http://<your-server-ip>:8090` or `http://<your-server-ip>:8100` on your old device. That's it.
 
 ---
 
@@ -110,7 +110,7 @@ Open `http://<your-server-ip>:8090` on your old device. That's it.
 
 ### Signing in
 
-1. Open `http://<your-server-ip>:8090` in your browser.
+1. Open `http://<your-server-ip>:8090` or :8100 version in your browser.
 2. Enter your Immich **email** and **password**.
 3. Optionally enter an **API Key** (generated in Immich → Account Settings → API Keys). If left empty, the session token from login is used automatically.
 4. Tap **Connect**. Your credentials are saved in `localStorage` so you only need to sign in once.
@@ -143,6 +143,7 @@ Open `http://<your-server-ip>:8090` on your old device. That's it.
 
 - The vertical bar on the right shows years and month initials.
 - Tap any label to jump directly to that month.
+>> **NOTE** : you don't have this option on 3G
 
 ### Lightbox
 
@@ -155,7 +156,7 @@ Open `http://<your-server-ip>:8090` on your old device. That's it.
 
 **All of your data stays on your own server.**
 
-Immich Lite is a static HTML file served by nginx. It makes API calls directly to your own Immich instance — there are no third-party servers, no analytics, no telemetry, and no external requests of any kind.
+Immich Legacy is a static HTML file served by nginx. It makes API calls directly to your own Immich instance — there are no third-party servers, no analytics, no telemetry, and no external requests of any kind.
 
 - Your photos and videos are fetched from **your Immich server** and displayed directly in your browser.
 - Your login credentials are stored only in your **browser's localStorage** on your device.
@@ -164,11 +165,11 @@ Immich Lite is a static HTML file served by nginx. It makes API calls directly t
 
 ---
 ## Tested devices:
-- Ipad 4 older
-- Iphone 7 Plus newer
-- Iphone XS newer
+- Ipad 4 OLD
+- Iphone 7 Plus NEW
+- Iphone XS NEW
 - PC of course
-- Iphone 3G (IN FUTURE) it's gonna be cool right?
+- Iphone 3G (Almost there) it's gonna be cool right?
 
 ## Proofs of work on IPAD
 
@@ -180,7 +181,6 @@ Immich Lite is a static HTML file served by nginx. It makes API calls directly t
 <img width="1536" height="1914" alt="IMG_2" src="https://github.com/user-attachments/assets/322ba042-df3c-4cd3-beec-44672c5bf759" />
 
 
-
-## License
-
-MIT
+## FAQ
+1) Why i need start a second container for another device?
+- The thing is that when you open a 3G website on an iPad 4, everything may be fine, but it doesn't work the other way around.
